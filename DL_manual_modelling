@@ -1,0 +1,220 @@
+# Creating a DL model based on mathematical equations
+# No use of keras/tensorflow packages
+
+
+# importing required packages
+import pandas as pd
+import numpy as np 
+from sklearn.model_selection import train_test_split
+
+np.random.seed(1)
+
+# import a data set which predicts the admission of a student based on various parameters -datasets_14872_228180_Admission_Predict.csv
+file_path = 'datasets_14872_228180_Admission_Predict.csv'
+df = pd.read_csv(file_path, index_col= 'Serial No.')
+
+x_features = df.drop(['Chance of Admit '], axis =1)          # droping the output/target variable
+y_target = df['Chance of Admit ']
+
+y_target = y_target.apply(lambda x: 1 if x>0.5 else 0)       # making the output boolean (0 or 1)
+y_target = np.array(y_target).reshape(400,1)
+
+# Feature scaling
+x_features = x_features/x_features.max()
+
+x_train, x_test, y_train, y_test = train_test_split(x_features, y_target, test_size=0.30, random_state=40, stratify = y_target)
+print(x_train.shape, y_train.shape)   
+print(x_test.shape, y_test.shape)
+
+# Transposing the matrices to make them in sync with the theoretical equations derived.
+y_train_new=y_train.transpose()
+y_test_new=y_test.transpose()
+x_train_new=x_train.transpose()
+x_test_new=x_test.transpose()
+print(x_train_new.shape)
+print(y_train_new.shape)
+print(x_test_new.shape)
+print(y_test_new.shape)
+
+
+# Defining a single hidden layer with 4 nodes in bettwen the input and output layer
+def layer_sizes(X, Y):
+    n_x = X.shape[0]
+    n_h = 4
+    n_y = Y.shape[0]
+    return (n_x, n_h, n_y)
+
+
+# Defining sigmoid activation function for output layer
+def sigmoid(z):
+    s = 1 / (1 + np.exp(-z))
+    return s
+
+
+# Defining leaky relu activation function for the hidden layer
+def relu(X):
+    np.where(X > 0, X, 0.001*X)
+    return X
+
+
+# Defining initialization of the weights and biases using random intitialization 
+def initialize_parameters(n_x, n_h, n_y):
+    np.random.seed(2)
+    W1 = np.random.randn(n_h, n_x) * 0.01
+    b1 = np.zeros((n_h, 1))
+    W2 = np.random.randn(n_y, n_h) * 0.01
+    b2 = np.zeros((n_y, 1))
+    
+    assert (W1.shape == (n_h, n_x))
+    assert (b1.shape == (n_h, 1))
+    assert (W2.shape == (n_y, n_h))
+    assert (b2.shape == (n_y, 1))
+    
+    parameters = {"W1": W1,
+                  "b1": b1,
+                  "W2": W2,
+                  "b2": b2}
+    
+    return parameters
+
+
+# Defining Forward Propagation
+def forward_propagation(X, parameters):
+    W1 = parameters["W1"]
+    b1 = parameters["b1"]
+    W2 = parameters["W2"]
+    b2 = parameters["b2"]
+    
+    Z1 = np.dot(W1,X) + b1
+    A1 = relu(Z1)                                           # Activation function for hidden layer
+    Z2 = np.dot(W2,A1) + b2
+    A2 = sigmoid(Z2)                                        # Activation function for output layer
+    
+    assert(A2.shape == (1, X.shape[1]))
+    
+    cache = {"Z1": Z1,
+             "A1": A1,
+             "Z2": Z2,
+             "A2": A2}
+    
+    return A2, cache
+
+
+# Function to compute the loss (cost fuction)
+def compute_cost(A2, Y, parameters):
+    m = Y.shape[1]
+    logprobs = np.multiply(np.log(A2), Y) + np.multiply((1 - Y), np.log(1 - A2))
+    cost = -np.sum(logprobs) / m
+    
+    cost = float(np.squeeze(cost))
+    assert(isinstance(cost, float))
+        
+    return cost
+
+
+# Defining backward propagation
+def backward_propagation(parameters, cache, X, Y):
+    m = X.shape[1]
+    
+    W1 = parameters["W1"]
+    W2 = parameters["W2"]
+    
+    A1 = cache["A1"]
+    A2 = cache["A2"]
+    
+    dZ2 = A2-Y
+    dW2 = (np.dot(dZ2, A1.T))/m
+    db2 = (np.sum(dZ2,axis = 1, keepdims = True))/m
+    dZ1 = np.multiply(np.dot(W2.T,dZ2), (1-np.power(A1,2)))
+    dW1 = (np.dot(dZ1,X.T)/m)
+    db1 = (np.sum(dZ1,axis = 1, keepdims = True))/m
+           
+    grads = {"dW1": dW1,
+             "db1": db1,
+             "dW2": dW2,
+             "db2": db2}
+    
+    return grads
+    
+
+# Defining a function to update the parameters based on gradients and learning rate
+def update_parameters(parameters, grads, learning_rate = 1.2):
+    
+    W1 = parameters["W1"]
+    b1 = parameters["b1"]
+    W2 = parameters["W2"]
+    b2 = parameters["b2"]
+    
+    dW1 = grads["dW1"]
+    db1 = grads["db1"]
+    dW2 = grads["dW2"]
+    db2 = grads["db2"]
+    
+    W1 = W1 - learning_rate*dW1
+    b1 = b1 - learning_rate*db1
+    W2 = W2 - learning_rate*dW2
+    b2 = b2 - learning_rate*db2
+    
+    parameters = {"W1": W1,
+                  "b1": b1,
+                  "W2": W2,
+                  "b2": b2}
+    
+    return parameters
+    
+    
+# Defining the ANN model
+def nn_model(X, Y, n_h, num_iterations = 10000, print_cost=False):
+    
+    np.random.seed(3)
+    n_x = layer_sizes(X, Y)[0]
+    n_y = layer_sizes(X, Y)[2]
+    
+    parameters = initialize_parameters(n_x,n_h,n_y)
+    W1 = parameters["W1"]
+    b1 = parameters["b1"]
+    W2 = parameters["W2"]
+    b2 = parameters["b2"]
+    
+    for i in range(0, num_iterations):
+        A2, cache = forward_propagation(X,parameters)
+        cost =compute_cost(A2,Y,parameters,)
+        grads = backward_propagation(parameters,cache,X,Y)
+        parameters = update_parameters(parameters,grads)
+     
+        
+        if print_cost and i % 1000 == 0:
+            print ("Cost after iteration %i: %f" %(i, cost))
+                   
+                        
+    return parameters
+    
+
+# Function to predict the test data
+def predict(parameters, X):
+    A2, cache = forward_propagation(X,parameters)
+    predictions = 1*(A2>0.5)
+    
+    return predictions
+    
+    
+# Calling the model and evaluating the performance  
+parameters = nn_model(x_train_new,  y_train_new, n_h = 4, num_iterations = 2296, print_cost=True)
+predictions = predict(parameters,x_test_new)
+print ('Accuracy: %d' % float((np.dot(y_test_new,predictions.T) + np.dot(1-y_test_new,1-predictions.T))/float(y_test_new.size)*100) + '%')
+
+
+/* 
+Model output received:
+Cost after iteration 0: 0.693202
+Cost after iteration 1000: 0.205259
+Cost after iteration 2000: 0.186276
+Accuracy: 90%
+*/
+
+/*
+Insigths and observations:
+The maximum number of iterations/epoch reached is 2296. Beyound this, the cost function increases
+and explosion of gradients is observed. 
+Different intialization methods may be used to tackle this issue.
+*/
