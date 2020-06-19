@@ -89,9 +89,9 @@ Accuracy on test data: 91.73%
 
 Insights:
 Adding regularization improves the model performance during manual testing with single images.
-For experimental purposes dropout regularization was added to the convolutional layer which resulted
+For experimental purposes dropout regularization was added to the convolution layer which resulted
 in significant drop in accuracy as the number of features got reduced.
 
 While reading train and test data, the file path should point the directory containing cat and dog folders (subdirectories).
-Based on the sundirectories available it automatically creates classifications or classes.
+Based on the subdirectories available it automatically creates classifications or classes.
 */
