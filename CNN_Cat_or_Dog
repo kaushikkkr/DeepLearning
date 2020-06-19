@@ -1,0 +1,97 @@
+# Creating a CNN model as image classifier to predict for Cat and Dog images
+# Datase used: https://drive.google.com/drive/folders/1WQMXmfzdLNAJ-L00t90w6sHkMyCMdDby?usp=sharing
+
+
+# Importing required packages
+import PIL
+import keras
+import numpy as np 
+from keras import layers
+from keras import regularizers
+from keras.layers import Dropout
+from keras.models import Sequential
+from keras.preprocessing import image
+from keras.layers import Dense, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+from keras.preprocessing.image import ImageDataGenerator
+
+
+img_x, img_y = 64, 64                                       # Input dimensions of the images
+
+
+# pre-processing train data
+train_datagen = ImageDataGenerator(rescale = 1./255,
+                                   shear_range = 0.2,
+                                   zoom_range = 0.2,
+                                   horizontal_flip = True)
+
+# Reading the train dataset
+training_set = train_datagen.flow_from_directory('train',
+                                                 target_size = (img_x, img_y),
+                                                 batch_size = 32,
+                                                 class_mode = 'binary')
+
+
+# pre-processing test data
+test_datagen = ImageDataGenerator(rescale = 1./255)
+
+# Reading the test dataset
+test_set = test_datagen.flow_from_directory('test',
+                                            target_size = (img_x, img_y),
+                                            batch_size = 32,
+                                            class_mode = 'binary')
+
+
+# Defining the CNN model
+
+cnn = Sequential()
+cnn.add(Conv2D(filters=32, kernel_size=3, kernel_initializer='he_uniform', activation='relu', input_shape=[64, 64, 3],
+kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4), bias_regularizer=regularizers.l2(1e-4),
+activity_regularizer=regularizers.l2(1e-5)))
+cnn.add(MaxPooling2D(pool_size=2, strides=2))
+cnn.add(Conv2D(filters=32, kernel_size=3, activation='relu'))
+cnn.add(MaxPooling2D(pool_size=2, strides=2))
+cnn.add(Flatten())
+# Adding the ANN layer to it
+cnn.add(Dense(units=128, kernel_initializer='he_uniform', activation='relu'), 
+kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4), bias_regularizer=regularizers.l2(1e-4),
+activity_regularizer=regularizers.l2(1e-5)))
+cnn.add(Dropout(0.2))
+cnn.add(Dense(units=1, activation='sigmoid'))
+
+
+# Compiling and building the model
+cnn.compile(optimizer = 'adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
+cnn.fit(x = training_set, validation_data = test_set, epochs = 25)
+
+
+# Model evaluation
+score = cnn.evaluate(test_set, verbose=0)
+print('Accuracy on test data: {}% \nError on test data: {}'.format(score[1], 1 - score[1]))
+
+
+# Single image prediction
+test_image = image.load_img(r'C:\Users\Desktop\test\Cats\104.jpg', target_size = (64, 64))
+test_image = image.img_to_array(test_image)
+test_image = np.expand_dims(test_image, axis = 0)
+result = cnn.predict(test_image)
+training_set.class_indices
+if result[0][0] == 1:
+    prediction = 'dog'
+else:
+    prediction = 'cat'
+print(prediction)
+
+
+/*
+Results:
+Accuracy on test data: 91.73%
+
+Insights:
+Adding regularization improves the model performance during manual testing with single images.
+For experimental purposes dropout regularization was added to the convolutional layer which resulted
+in significant drop in accuracy as the number of features got reduced.
+
+While reading train and test data, the file path should point the directory containing cat and dog folders (subdirectories).
+Based on the sundirectories available it automatically creates classifications or classes.
+*/
