@@ -1,0 +1,103 @@
+# Creating an ANN model with Keras
+# Using the ANN model to predict if an employee will exit the scheme or not
+# Dataset used is Churn_Modelling .csv
+
+
+# Importing all the required packages
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+from sklearn.preprocessing import LabelEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import StandardScaler
+from keras import layers
+from keras import regularizers
+import tensorflow as tf
+from keras.layers import Dropout
+
+
+# Reading the dataset
+file_path = 'Churn_Modelling .csv'
+dataset = pd.read_csv(file_path, index_col= 'RowNumber')
+print(dataset.head())
+
+
+X = dataset.iloc[:, 2:-1].values                             # Extracting all the features
+y = dataset.iloc[:, -1].values                               # Extracting the target column
+
+
+# Using label encoder to convert the gender column into binary values
+le = LabelEncoder()
+X[:, 2] = le.fit_transform(X[:, 2])
+print(X[0])
+
+
+# Using one hot encoding on Geography column which has three unique country values
+ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
+X = np.array(ct.fit_transform(X))
+print(X[0])
+
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0, stratify = y)
+
+
+# Feature scaling of test and train data
+sc = StandardScaler()
+X_train = sc.fit_transform(X_train)
+X_test = sc.transform(X_test)
+
+
+# Defining the model
+
+layer = layers.Dense(
+units=64,
+kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),
+bias_regularizer=regularizers.l2(1e-4),
+activity_regularizer=regularizers.l2(1e-5))
+
+model = Sequential([layer])
+model.add(Dense(60, input_dim=12, activation='relu', kernel_constraint= tf.keras.constraints.max_norm(3)))
+model.add(Dropout(0.2))
+model.add(Dense(30, activation='relu', kernel_constraint=tf.keras.constraints.max_norm(3)))
+model.add(Dropout(0.2))
+model.add(Dense(1, activation='sigmoid'))
+
+
+# Compiling and building the model
+model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=100,batch_size=32)
+
+
+# Evaluating the training accuracy
+pred_train= model.predict(X_train)
+scores = model.evaluate(X_train, y_train, verbose=0)
+print('Accuracy on training data: {} \n Error on training data: {}'.format(scores[1], 1 - scores[1]))
+
+
+# Evaluating the model
+pred_test= model.predict(X_test)
+scores2 = model.evaluate(X_test, y_test, verbose=0)
+print('Accuracy on test data: {} \n Error on test data: {}'.format(scores2[1], 1 - scores2[1]))
+
+
+/*
+Reults:
+
+Accuracy on training data: 0.8827499747276306 
+Error on training data: 0.11725002527236938
+
+Accuracy on test data: 0.8575000166893005
+Error on test data: 0.14249998331069946
+
+*/
+
+
+/*
+Insights: Adding regularizers L1-L2, dropout, slightly increases the accuracy score of the model,
+          but significantly increases the training accuracy of the model.
+*/
