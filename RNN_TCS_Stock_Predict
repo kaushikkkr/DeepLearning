@@ -198,4 +198,7 @@ plt.show()
 Analysis: RNN is much faster compared to CNN and ANN. Increasing time steps require more computation time.
 This model performs pretty well with three years of data. If the data available for training is less we should reduce
 the timesteps to 60 (from 120) to facilitate more LSTM cycles and thereby improving the performance.
+
+Since, the features used here are multicollinear in nature, fundamentally it is better to use only one feature as multicollinear 
+variables add huge variance and inflation to the model.
 */
