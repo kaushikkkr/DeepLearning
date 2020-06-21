@@ -1,0 +1,96 @@
+# This code is to scrape Date, Open, Close, High, Low, Adj_close, Volume data for TCS
+# 5 years of data is scraped from yahoo finance from June 2020 to June 2015
+# BeautifulSoup and selenium is used.
+# Chromedriver is used to fetch data via chrome browser
+
+
+# Importing Required Packages
+import time
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+
+
+ticker_symbol = 'TCS'                                       # Ticker symbol of (TCS) company who's stock price to be predicted
+ticker_symbol = ticker_symbol.upper()
+
+
+# Scrapping 5 years of data from YAHOO finance from June'20 to June'15
+
+url = 'https://finance.yahoo.com/quote/{}/history?period1=1434844800&period2=1592697600&interval=1d&filter=history&frequency=1d'.format(ticker_symbol)
+driver = webdriver.Chrome(r'C:\Users\Downloads/chromedriver')  # Location of the chromedriver file
+driver.get(url)
+heights = []
+counter = 0
+for i in range(1,300):
+    bg = driver.find_element_by_css_selector('body')
+    time.sleep(0.1)
+    bg.send_keys(Keys.END)
+    heights.append(driver.execute_script("return document.body.scrollHeight"))
+    try :
+        bottom = heights[i-16]
+    except:
+        pass
+    if i%16 ==0:
+        new_bottom = heights[i-1]
+        if bottom == new_bottom:
+            break
+
+# The above code opens chrome browser and scrape data for infinite scrolling webpages
+
+
+# Using beautifulsoup to capture the entire page source data
+soup = BeautifulSoup(driver.page_source, 'lxml')
+soup_tab = soup.find_all('span')                        # From source page inspection found that all required data are contained between <span> tags
+
+
+# Filtering data and storing it in a pandas dataframe
+Date=[]
+Open=[]
+High=[]
+Low=[]
+Close=[]
+Adj_Close=[]
+Volume=[]
+fg = 0
+i = 0
+for row in soup_tab:
+    if (row.getText() == "Jun 19, 2020"):
+        fg=1
+    if (row.getText() == "Jun 22, 2015"):
+        fg=0
+    if(fg == 1):
+        strg = row.getText()
+        if (strg == "Dividend"):
+            i=0
+            strg=Date.pop()
+            continue
+        if (strg == None):
+            strg =''
+            print(row)
+        if(i==0):
+            Date.append(strg)
+            i+=1
+        elif(i==1):
+            Open.append(float(strg))
+            i+=1
+        elif(i==2):
+            High.append(float(strg))
+            i+=1
+        elif(i==3):
+            Low.append(float(strg))
+            i+=1
+        elif(i==4):
+            Close.append(float(strg))
+            i+=1
+        elif(i==5):
+            Adj_Close.append(float(strg))
+            i+=1
+        else:
+            strg= strg.split(',')[0].strip()+strg.split(',')[1].strip()
+            Volume.append(float(strg))
+            i=0
+df= pd.DataFrame({"Date": Date, "Open": Open, "High": High, "Low": Low, "Close": Close, "Adj_Close": Adj_Close, "Volume": Volume })
+print(df.shape)                                             # (1258, 7)
