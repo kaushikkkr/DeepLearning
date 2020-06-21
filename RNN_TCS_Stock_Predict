@@ -115,7 +115,7 @@ training_set_scaled = sc.fit_transform(training_set)
 X_train = []
 y_train = []
 for i in range(653, 96, -1):
-    X_train.append(training_set_scaled[i+120:i:-1, :])      # Bottom to top approach as Dataset is in decending order
+    X_train.append(training_set_scaled[i+120:i:-1, :])      # Bottom to top approach as Dataset is in descending order
     y_train.append(training_set_scaled[i, 0])
 X_train, y_train = np.array(X_train), np.array(y_train)
 X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))       # Shape = (557, 120, 6)
@@ -158,7 +158,7 @@ regressor.fit(X_train, y_train, epochs = 100, batch_size = 32)
 X_test = []
 y_test = []
 for i in range(96, 77, -1):
-    X_test.append(training_set_scaled[i+120:i:-1, :])       # Bottom to top approach as Dataset is in decending order      
+    X_test.append(training_set_scaled[i+120:i:-1, :])       # Bottom to top approach as Dataset is in descending order      
     y_test.append(training_set[i, 0])
 X_test, y_test = np.array(X_test), np.array(y_test)
 X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_test.shape[2]))
@@ -201,4 +201,6 @@ the timesteps to 60 (from 120) to facilitate more LSTM cycles and thereby improv
 
 Since, the features used here are multicollinear in nature, fundamentally it is better to use only one feature as multicollinear 
 variables add huge variance and inflation to the model.
+df.corr() suggests that volume has a very weak corelation with the other features. Considering open price and volume as features
+yeild much better performance.
 */
