@@ -1,0 +1,201 @@
+# This code is used for predicting the open price of a particular stock (here TCS is used).
+# RNN moel is used for the same with 120 time steps.
+# Model is trained with approximately 3 years of data and is used to predict for one month of data
+
+
+# Importing required packages
+import csv
+import time
+import requests
+import numpy as np
+import pandas as pd
+from bs4 import BeautifulSoup 
+from keras.layers import LSTM
+from keras.layers import Dense
+from selenium import webdriver
+import matplotlib.pyplot as plt
+from keras.layers import Dropout
+from keras.models import Sequential
+from sklearn.preprocessing import MinMaxScaler
+from selenium.webdriver.common.keys import Keys
+
+
+ticker_symbol = 'TCS'                                       # Ticker symbol of (TCS) company who's stock price to be predicted
+ticker_symbol = ticker_symbol.upper()
+
+
+# Scrapping 5 years of data from YAHOO finance from June'20 to June'15
+
+url = 'https://finance.yahoo.com/quote/{}/history?period1=1434844800&period2=1592697600&interval=1d&filter=history&frequency=1d'.format(ticker_symbol)
+driver = webdriver.Chrome(r'C:\Users\Downloads/chromedriver')  # Location of the chromedriver file
+driver.get(url)
+heights = []
+counter = 0
+for i in range(1,300):
+    bg = driver.find_element_by_css_selector('body')
+    time.sleep(0.1)
+    bg.send_keys(Keys.END)
+    heights.append(driver.execute_script("return document.body.scrollHeight"))
+    try :
+        bottom = heights[i-16]
+    except:
+        pass
+    if i%16 ==0:
+        new_bottom = heights[i-1]
+        if bottom == new_bottom:
+            break
+
+# The above code opens chrome browser and scrape data for infinite scrolling webpages
+
+
+# Using beautifulsoup to capture the entire page source data
+soup = BeautifulSoup(driver.page_source, 'lxml')
+soup_tab = soup.find_all('span')                        # From source page inspection found that all required data are contained between <span> tags
+
+
+# Filtering data and storing it in a pandas dataframe
+Date=[]
+Open=[]
+High=[]
+Low=[]
+Close=[]
+Adj_Close=[]
+Volume=[]
+fg = 0
+i = 0
+for row in soup_tab:
+    if (row.getText() == "Jun 19, 2020"):
+        fg=1
+    if (row.getText() == "Jun 22, 2015"):
+        fg=0
+    if(fg == 1):
+        strg = row.getText()
+        if (strg == "Dividend"):
+            i=0
+            strg=Date.pop()
+            continue
+        if (strg == None):
+            strg =''
+            print(row)
+        if(i==0):
+            Date.append(strg)
+            i+=1
+        elif(i==1):
+            Open.append(float(strg))
+            i+=1
+        elif(i==2):
+            High.append(float(strg))
+            i+=1
+        elif(i==3):
+            Low.append(float(strg))
+            i+=1
+        elif(i==4):
+            Close.append(float(strg))
+            i+=1
+        elif(i==5):
+            Adj_Close.append(float(strg))
+            i+=1
+        else:
+            strg= strg.split(',')[0].strip()+strg.split(',')[1].strip()
+            Volume.append(float(strg))
+            i=0
+df= pd.DataFrame({"Date": Date, "Open": Open, "High": High, "Low": Low, "Close": Close, "Adj_Close": Adj_Close, "Volume": Volume })
+print(df.shape)                                             # (1258, 7)
+
+
+training_set = df.iloc[:, 1:7].values                       # Dropping the Date column
+
+
+# Feature scaling
+sc = MinMaxScaler(feature_range = (0, 1))
+training_set_scaled = sc.fit_transform(training_set)
+
+
+# Creating training set with 120 time steps for 3years of data till 31st Jan 2020
+X_train = []
+y_train = []
+for i in range(653, 96, -1):
+    X_train.append(training_set_scaled[i+120:i:-1, :])      # Bottom to top approach as Dataset is in decending order
+    y_train.append(training_set_scaled[i, 0])
+X_train, y_train = np.array(X_train), np.array(y_train)
+X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))       # Shape = (557, 120, 6)
+
+
+# Defining and building the RNN Model
+
+# Initialising the RNN
+regressor = Sequential()
+
+# Adding the first LSTM layer and some Dropout regularisation
+regressor.add(LSTM(units = 50, return_sequences = True, input_shape = (X_train.shape[1], X_train.shape[2])))
+regressor.add(Dropout(0.2))
+
+# Adding a second LSTM layer and some Dropout regularisation
+regressor.add(LSTM(units = 50, return_sequences = True))
+regressor.add(Dropout(0.2))
+
+# Adding a third LSTM layer and some Dropout regularisation
+regressor.add(LSTM(units = 50, return_sequences = True))
+regressor.add(Dropout(0.2))
+
+# Adding a fourth LSTM layer and some Dropout regularisation
+regressor.add(LSTM(units = 50))
+regressor.add(Dropout(0.2))
+
+# Adding the output layer
+regressor.add(Dense(units = 1))
+
+# Compiling the RNN
+regressor.compile(optimizer = 'adam', loss = 'mean_squared_error')
+
+# Fitting the RNN to the Training set
+regressor.fit(X_train, y_train, epochs = 100, batch_size = 32)
+
+# Final Epoch output : Epoch 100/100 557/557 [==============================] - 5s 8ms/step - loss: 7.3359e-04
+
+
+# Taking test data as month of Feb'2020 for open price predictions
+X_test = []
+y_test = []
+for i in range(96, 77, -1):
+    X_test.append(training_set_scaled[i+120:i:-1, :])       # Bottom to top approach as Dataset is in decending order      
+    y_test.append(training_set[i, 0])
+X_test, y_test = np.array(X_test), np.array(y_test)
+X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_test.shape[2]))
+print(X_test.shape)                                         # (19, 120, 6)
+
+
+# Using the trained model to predict:
+predicted_stock_price = regressor.predict(X_test)
+
+
+# Since the output is scalled we need to inverse scle the data to obtain the real data.
+# We can't directly use inverse_transform as the fit_transform had 6 features in for train data.
+# And varibale predicted_stock_price has only one feature that is the predicted open prices
+
+# Inverse Scaling
+print(sc.min_)
+print(sc.scale_)
+print(sc.data_min_)
+print(sc.data_max_)
+
+scale= MinMaxScaler()                                        # Initializing a different scaler of 1 variable
+scale.min_,scale.scale_=sc.min_[0],sc.scale_[0]              # Initializing its value with with the values of open price column
+
+predicted_stock_price_act = scale.inverse_transform(predicted_stock_price)      
+
+
+# Vizualizing the predicted data vs the actual data
+plt.plot(y_test, color = 'red', label = 'Real TCS Stock Price')
+plt.plot(predicted_stock_price_act, color = 'blue', label = 'Predicted TCS Stock Price')
+plt.title('TCS Stock Price Prediction')
+plt.xlabel('Time')
+plt.ylabel('TCS Stock Price')
+plt.legend()
+plt.show()
+
+/*
+Analysis: RNN is much faster compared to CNN and ANN. Increasing time steps require more computation time.
+This model performs pretty well with three years of data. If the data available for training is less we should reduce
+the timesteps to 60 (from 120) to facilitate more LSTM cycles and thereby improving the performance.
+*/
